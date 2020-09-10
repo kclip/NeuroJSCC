@@ -1,7 +1,8 @@
 from utils import misc as misc_wispike
 from utils.training_utils import init_training_wispike
 from test.testing_utils import get_acc_wispike
-from snn.utils import utils_snn as misc_snn
+from snn.utils.utils_snn import *
+from snn.utils.misc import *
 from snn.models.SNN import BinarySNN
 from snn.training_utils.snn_training import local_feedback_and_update
 import torch
@@ -28,15 +29,7 @@ def train_neurojscc(args):
 
     for _ in range(args.num_ite):
         ### Find indices
-        if args.labels is not None:
-            print(args.labels)
-            indices = np.random.choice(misc_snn.find_train_indices_for_labels(args.dataset, args.labels), [args.num_samples_train], replace=True)
-            num_samples_test = min(args.num_samples_test, len(misc_snn.find_test_indices_for_labels(args.dataset, args.labels)))
-            test_indices = np.random.choice(misc_snn.find_test_indices_for_labels(args.dataset, args.labels), [num_samples_test], replace=False)
-        else:
-            indices = np.random.choice(np.arange(args.dataset.root.stats.train_data[0]), [args.num_samples_train], replace=True)
-            test_indices = np.random.choice(np.arange(args.dataset.root.stats.test_data[0]), [args.num_samples_test], replace=False)
-
+        indices, test_indices = get_indices(args)
 
         encoder = BinarySNN(**make_network_parameters(network_type=args.model,
                                                       n_input_neurons=args.n_input_neurons,
@@ -110,8 +103,8 @@ def train_neurojscc(args):
                     encoder.train()
                     decoder.train()
 
-            misc_snn.refractory_period(encoder)
-            misc_snn.refractory_period(decoder)
+            refractory_period(encoder)
+            refractory_period(decoder)
 
             sample_enc, output_dec = get_example(train_data, idx, T, args.n_classes, args.input_shape, args.dt, args.dataset.root.stats.train_data[1], args.polarity)
 
