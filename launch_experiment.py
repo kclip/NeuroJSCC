@@ -1,28 +1,33 @@
 from __future__ import print_function
-from snn.utils.misc import *
-from neuroJSCC import train_neurojscc
-import numpy as np
-import tables
 import pickle
+
 import argparse
+import numpy as np
+from snn.utils.misc import mksavedir, str2bool
+import tables
+import torch
+
+from experiments.neuroJSCC import train_neurojscc
+from experiments.train_vqvae import train_vqvae_ldpc
 
 ''''
 '''
 
 if __name__ == "__main__":
     # setting the hyper parameters
-    parser = argparse.ArgumentParser(description='Train probabilistic multivalued SNNs using Pytorch')
+    parser = argparse.ArgumentParser(description='')
 
     # Training arguments
     parser.add_argument('--where', default='local')
     parser.add_argument('--dataset', default='mnist_dvs')
+    parser.add_argument('--model', default='neurojscc', choices=['neurojscc', 'vqvae'])
     parser.add_argument('--num_ite', default=5, type=int, help='Number of times every experiment will be repeated')
     parser.add_argument('--test_period', default=1000, type=int, help='')
 
     parser.add_argument('--dt', default=25000, type=int, help='')
     parser.add_argument('--sample_length', default=2000, type=int, help='')
-    parser.add_argument('--input_shape', nargs='+', default=[1352], type=int, help='Shape of an input sample')
-    parser.add_argument('--polarity', default='true', type=str, help='Use polarity or not')
+    parser.add_argument('--input_shape', nargs='+', default=[676], type=int, help='Shape of an input sample')
+    parser.add_argument('--polarity', default='false', type=str, help='Use polarity or not')
 
     parser.add_argument('--num_samples_train', default=None, type=int, help='Number of samples to train on for each experiment')
     parser.add_argument('--num_samples_test', default=None, type=int, help='Number of samples to test on')
@@ -39,6 +44,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_h', default=256, type=int, help='Number of hidden neurons')
     parser.add_argument('--topology_type', default='fully_connected', type=str, choices=['fully_connected', 'feedforward', 'layered', 'custom'], help='Topology of the network')
     parser.add_argument('--density', default=None, type=int, help='Density of the connections if topology_type is "sparse"')
+    parser.add_argument('--n_neurons_per_layer', default=0, type=int, help='Number of neurons per layer if topology_type is "layered"')
     parser.add_argument('--initialization', default='uniform', type=str, choices=['uniform', 'glorot'], help='Initialization of the weights')
     parser.add_argument('--weights_magnitude', default=0.05, type=float, help='Magnitude of weights at initialization')
 
@@ -57,11 +63,23 @@ if __name__ == "__main__":
     parser.add_argument('--gamma', default=1., type=float, help='KL regularization strength')
 
 
-    # Arguments for comms
-    parser.add_argument('--systematic', type=str, default='true', help='Systematic communication')
+    # Arguments for communications
     parser.add_argument('--rand_snr', type=str, default='false', help='Use random SNR for each sample during training to make it more robust')
-    parser.add_argument('--snr', type=float, default=None, help='SNR')
+    parser.add_argument('--snr', type=float, default=0, help='SNR')
+
+    # Argument for NeuroJSCC
+    parser.add_argument('--systematic', type=str, default='true', help='Systematic communication')
     parser.add_argument('--n_output_enc', default=128, type=int, help='Number of the hidden neurons that are output neurons for the encoder')
+
+
+    # Arguments for VQVAE + LDPC
+    parser.add_argument('--classifier', type=str, default='snn', choices=['snn', 'mlp'])
+    parser.add_argument('--embedding_dim', default=32, type=int, help='Size of VQ-VAE latent embeddings')
+    parser.add_argument('--num_embeddings', default=10, type=int, help='Number of VQ-VAE latent embeddings')
+    parser.add_argument('--lr_vqvae', default=1e-3, type=float, help='Learning rate of VQ-VAE')
+    parser.add_argument('--maxiter', default=100, type=int, help='Max number of iteration for BP decoding of LDPC code')
+    parser.add_argument('--n_frames', default=80, type=int, help='')
+
 
     args = parser.parse_args()
 
@@ -94,7 +112,15 @@ else:
     print('Error: dataset not found')
 
 dataset = tables.open_file(dataset)
+args.polarity = str2bool(args.polarity)
+args.n_classes = dataset.root.stats.test_label[1]
 
+args.disable_cuda = str2bool(args.disable_cuda)
+args.device = None
+if not args.disable_cuda and torch.cuda.is_available():
+    args.device = torch.device('cuda')
+else:
+    args.device = torch.device('cpu')
 
 ### Learning parameters
 if not args.num_samples_train:
@@ -103,7 +129,6 @@ if not args.num_samples_train:
 if args.test_period is not None:
     if not args.num_samples_test:
         args.num_samples_test = dataset.root.stats.test_data[0]
-
     args.ite_test = np.arange(0, args.num_samples_train, args.test_period)
 
     if args.save_path is not None:
@@ -115,7 +140,10 @@ if args.test_period is not None:
 
 
 # Save results and weights
-name = args.dataset + r'_' + args.model + r'_%d_epochs_nh_%d_nout_%d' % (args.num_samples_train, args.n_h, args.n_output_enc) + args.suffix
+if args.model == 'neurojscc':
+    name = args.dataset + r'_' + args.model + r'_%d_epochs_nh_%d_nout_%d' % (args.num_samples_train, args.n_h, args.n_output_enc) + args.suffix
+else:
+    name = 'vqvae_' + args.classifier + r'_%d_epochs_nh_%d_nemb_%d_nframes_%d' % (args.num_samples_train, args.n_h, args.num_embeddings, args.n_frames) + args.suffix
 
 results_path = home + r'/results/'
 if args.save_path is None:
@@ -126,16 +154,6 @@ with open(args.save_path + 'commandline_args.pkl', 'wb') as f:
 
 
 args.dataset = dataset
-
-args.disable_cuda = str2bool(args.disable_cuda)
-args.device = None
-if not args.disable_cuda and torch.cuda.is_available():
-    args.device = torch.device('cuda')
-else:
-    args.device = torch.device('cpu')
-
-args.polarity = str2bool(args.polarity)
-args.n_classes = args.dataset.root.stats.test_label[1]
 
 ### Network parameters
 if args.polarity:
@@ -156,9 +174,13 @@ if args.topology_type == 'custom':
 else:
     args.topology = None
 
-args.systematic = str2bool(args.systematic)
 args.rand_snr = str2bool(args.rand_snr)
 
 # Training
-train_neurojscc(args)
+if args.model == 'neurojscc':
+    train_neurojscc(args)
+
+elif args.model == 'vqvae':
+    train_vqvae_ldpc(args)
+
 

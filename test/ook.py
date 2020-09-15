@@ -1,20 +1,21 @@
-import torch
-from models.SNN import SNNetwork
-from utils import utils_snn as misc_snn
-import numpy as np
 import pickle
-from wispike.utils.misc import channel
-from wispike.test.testing_utils import classify
+
+import numpy as np
 import pyldpc
-from wispike.utils.misc import example_to_framed, channel_coding_decoding
+import torch
+
+from snn.models.SNN import BinarySNN
+from snn.utils.utils_snn import *
+from snn.utils.misc import make_network_parameters, find_indices_for_labels
+from utils.misc import channel
+from test.testing_utils import classify
+from utils.misc import example_to_framed, channel_coding_decoding
 
 
 def ook_test(args):
-    args.residual = 0 #todo
+    args.residual = 0  # Samples are sent 1 by 1
 
-    network = SNNetwork(**misc_snn.make_network_parameters(args.n_input_neurons,
-                                                           args.n_output_neurons,
-                                                           args.n_h),
+    network = BinarySNN(**make_network_parameters(args.n_input_neurons, args.n_output_neurons, args.n_h),
                         device=args.device)
 
     weights = args.results + args.classifier_weights
@@ -26,16 +27,16 @@ def ook_test(args):
 
     for snr in args.snr_list:
         for _ in range(args.num_ite):
-            test_indices = np.random.choice(misc_snn.find_test_indices_for_labels(args.dataset, args.labels), [args.num_samples_test], replace=False)
+            test_indices = np.random.choice(find_indices_for_labels(args.dataset.root.test, args.labels), [args.num_samples_test], replace=False)
 
             predictions_final = torch.zeros([args.num_samples_test], dtype=torch.long)
             predictions_pf = torch.zeros([args.num_samples_test, args.n_frames], dtype=torch.long)
 
             for i, idx in enumerate(test_indices):
                 sample = channel(torch.FloatTensor(args.dataset.root.test.data[idx]).to(network.device), network.device, snr)
-                predictions_final[i], predictions_pf[i] = classify(network, sample, args, 'both')
+                predictions_final[i], predictions_pf[i] = classify(network, sample, args)
 
-            true_classes = torch.max(torch.sum(torch.FloatTensor(args.dataset.root.test.label[:][test_indices]), dim=-1), dim=-1).indices
+            true_classes = torch.LongTensor(args.dataset.root.test.labels[test_indices, 0])
 
             accs_final = float(torch.sum(predictions_final == true_classes, dtype=torch.float) / len(predictions_final))
             accs_pf = torch.zeros([args.n_frames], dtype=torch.float)
@@ -56,12 +57,10 @@ def ook_test(args):
 
 
 def ook_ldpc_test(args):
-    args.residual = 0  # todo
-    args.n_frames = 80
+    args.n_frames = 80  # Samples are sent 1 by 1
+    args.residual = 0
 
-    network = SNNetwork(**misc_snn.make_network_parameters(args.n_input_neurons,
-                                                           args.n_output_neurons,
-                                                           args.n_h),
+    network = BinarySNN(**make_network_parameters(args.n_input_neurons, args.n_output_neurons, args.n_h),
                         device=args.device)
 
     weights = args.results + args.classifier_weights
@@ -101,7 +100,7 @@ def ook_ldpc_test(args):
     for snr in args.snr_list:
         args.snr = snr
         for _ in range(args.num_ite):
-            test_indices = np.random.choice(misc_snn.find_test_indices_for_labels(args.dataset, args.labels), [args.num_samples_test], replace=False)
+            test_indices = np.random.choice(find_indices_for_labels(args.dataset.root.test, args.labels), [args.num_samples_test], replace=False)
 
             predictions_final = torch.zeros([args.num_samples_test], dtype=torch.long)
             predictions_pf = torch.zeros([args.num_samples_test, args.n_frames], dtype=torch.long)
@@ -114,9 +113,9 @@ def ook_ldpc_test(args):
                     frame = data[j].unsqueeze(0)
                     data_reconstructed[j] = torch.FloatTensor(channel_coding_decoding(args, frame))
 
-                predictions_final[i], predictions_pf[i] = classify(network, data_reconstructed, args, 'both')
+                predictions_final[i], predictions_pf[i] = classify(network, data_reconstructed, args)
 
-            true_classes = torch.max(torch.sum(torch.FloatTensor(args.dataset.root.test.label[:][test_indices]), dim=-1), dim=-1).indices
+            true_classes = torch.LongTensor(args.dataset.root.test.labels[test_indices, 0])
 
             accs_final = float(torch.sum(predictions_final == true_classes, dtype=torch.float) / len(predictions_final))
             accs_pf = torch.zeros([args.n_frames], dtype=torch.float)

@@ -1,22 +1,27 @@
-from utils import misc as misc_wispike
-from utils.training_utils import init_training_wispike
-from test.testing_utils import get_acc_wispike
-from snn.utils.utils_snn import *
-from snn.utils.misc import *
-from snn.models.SNN import BinarySNN
-from snn.training_utils.snn_training import local_feedback_and_update
+import pickle
+import os
+
 import torch
 import numpy as np
-import pickle
+
+from snn.utils.utils_snn import refractory_period
+from snn.utils.misc import get_indices, make_network_parameters, str2bool
+from snn.models.SNN import BinarySNN
+from snn.training_utils.snn_training import local_feedback_and_update
 from snn.utils.filters import get_filter
-import os
 from snn.data_preprocessing.load_data import get_example
+
+from utils.misc import channel
+from utils.training_utils import init_training_wispike
+from test.neurojscc_test import get_acc_neurojscc
 
 
 def train_neurojscc(args):
+
     ### Network parameters
     n_hidden_enc = args.n_h
 
+    args.systematic = str2bool(args.systematic)
     if args.systematic:
         n_transmitted = args.n_input_neurons + args.n_output_enc
     else:
@@ -41,7 +46,7 @@ def train_neurojscc(args):
                                                       density=args.density,
                                                       weights_magnitude=args.weights_magnitude,
                                                       initialization=args.initialization,
-                                                      synaptic_filter=get_filter(args.ff_filter),
+                                                      synaptic_filter=get_filter(args.syn_filter),
                                                       n_basis_ff=args.n_basis_ff,
                                                       n_basis_fb=args.n_basis_fb,
                                                       tau_ff=args.tau_ff,
@@ -60,7 +65,7 @@ def train_neurojscc(args):
                                                       density=args.density,
                                                       weights_magnitude=args.weights_magnitude,
                                                       initialization=args.initialization,
-                                                      synaptic_filter=get_filter(args.ff_filter),
+                                                      synaptic_filter=get_filter(args.syn_filter),
                                                       n_basis_ff=args.n_basis_ff,
                                                       n_basis_fb=args.n_basis_fb,
                                                       tau_ff=args.tau_ff,
@@ -88,8 +93,8 @@ def train_neurojscc(args):
 
             if args.test_accs:
                 if (j + 1) in args.test_accs:
-                    acc, _ = get_acc_wispike(encoder, decoder, args.n_output_enc, test_data, test_indices, T, args.n_classes, args.input_shape,
-                                             args.dt, args.dataset.root.stats.train_data[1], args.polarity, args.systematic, args.snr, howto='final')
+                    acc, _ = get_acc_neurojscc(encoder, decoder, args.n_output_enc, test_data, test_indices, T, args.n_classes, args.input_shape,
+                                               args.dt, args.dataset.root.stats.train_data[1], args.polarity, args.systematic, args.snr)
                     print('test accuracy at ite %d: %f' % (int(j + 1), acc))
                     args.test_accs[int(j + 1)].append(acc)
 
@@ -117,9 +122,9 @@ def train_neurojscc(args):
                 proba_hidden_enc = torch.sigmoid(encoder.potential[encoder.hidden_neurons - encoder.n_input_neurons])
 
                 if args.systematic:
-                    decoder_input = misc_wispike.channel(torch.cat((sample_enc[:, s], encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])), decoder.device, args.snr)
+                    decoder_input = channel(torch.cat((sample_enc[:, s], encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])), decoder.device, args.snr)
                 else:
-                    decoder_input = misc_wispike.channel(encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1], decoder.device, args.snr)
+                    decoder_input = channel(encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1], decoder.device, args.snr)
 
                 sample_dec = torch.cat((decoder_input, output_dec[:, s]), dim=0).to(decoder.device)
 

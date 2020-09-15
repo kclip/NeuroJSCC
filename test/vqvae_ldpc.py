@@ -1,12 +1,14 @@
-import torch
-from models.SNN import SNNetwork
-from utils import utils_snn as misc_snn
-from wispike.test.testing_utils import get_acc_classifier
-import numpy as np
 import pickle
-from wispike.utils.misc import get_intermediate_dims
-from wispike.utils.training_utils import init_vqvae, init_ldpc
-from wispike.models.mlp import MLP
+
+import torch
+import numpy as np
+from snn.models.SNN import BinarySNN
+from snn.utils.misc import make_network_parameters, find_indices_for_labels
+
+from test.testing_utils import get_acc_classifier
+from utils.misc import get_intermediate_dims
+from utils.training_utils import init_vqvae, init_ldpc
+from models.mlp import MLP
 
 
 def vqvae_test(args):
@@ -21,10 +23,9 @@ def vqvae_test(args):
 
     weights = args.results + args.weights
     if args.classifier == 'snn':
-        network = SNNetwork(**misc_snn.make_network_parameters(args.n_input_neurons,
-                                                               args.n_output_neurons,
-                                                               args.n_h),
+        network = BinarySNN(**make_network_parameters(args.n_input_neurons, args.n_output_neurons, args.n_h),
                             device=args.device)
+
         if args.classifier_weights is not None:
             try:
                 network_weights = args.results + args.classifier_weights + r'/snn_weights.hdf5'
@@ -33,7 +34,6 @@ def vqvae_test(args):
             except OSError:
                 network_weights = args.results + args.classifier_weights + r'/network_weights.hdf5'
                 network.import_weights(network_weights)
-
 
         else:
             try:
@@ -44,7 +44,7 @@ def vqvae_test(args):
                 network_weights = weights + r'/network_weights.hdf5'
                 network.import_weights(network_weights)
 
-        network.set_mode('test')
+        network.eval()
 
     elif args.classifier == 'mlp':
         n_input_neurons = np.prod(args.dataset.root.stats.train_data[1:])
@@ -64,6 +64,7 @@ def vqvae_test(args):
     vqvae.load_state_dict(torch.load(vqvae_weights))
     vqvae.eval()
 
+
     ### Channel & coding
     args.quantized_dim, args.encodings_dim = get_intermediate_dims(vqvae, args, args.dataset)
     args.H, args.G, args.k = init_ldpc(args.encodings_dim)
@@ -75,8 +76,8 @@ def vqvae_test(args):
         args.snr = snr
 
         for _ in range(args.num_ite):
-            test_indices = np.random.choice(misc_snn.find_test_indices_for_labels(args.dataset, args.labels), [args.num_samples_test], replace=False)
-            accs_final, accs_per_frame = get_acc_classifier(network, vqvae, args, test_indices, howto='both')
+            test_indices = np.random.choice(find_indices_for_labels(args.dataset.root.test, args.labels), [args.num_samples_test], replace=False)
+            accs_final, accs_per_frame = get_acc_classifier(network, vqvae, args, test_indices)
 
             print('snr %d, acc %f' % (snr, accs_final))
             res_final[snr].append(accs_final)
