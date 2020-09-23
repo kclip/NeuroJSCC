@@ -45,7 +45,9 @@ def classify_snn(network, example, args):
 
 
 def classify_mlp(network, example, args):
-    inputs = framed_to_example(example, args).flatten()
+    T = int(args.sample_length * 1000 / args.dt)
+
+    inputs = framed_to_example(example, args, T).flatten()
     output = network(inputs)
     predictions_final = torch.argmax(output)
     example_padded = torch.zeros(example.shape)
@@ -53,7 +55,7 @@ def classify_mlp(network, example, args):
 
     for f in range(example.shape[0]):
         example_padded[f] = example[f]
-        inputs = framed_to_example(example_padded, args).flatten()
+        inputs = framed_to_example(example_padded, args, T).flatten()
         output = network(inputs)
         predictions_pf[f] = torch.argmax(output)
 

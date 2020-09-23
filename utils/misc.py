@@ -11,18 +11,6 @@ def binarize(signal):
     return signal
 
 
-def channel(signal, device, snr_db):
-    sig_avg_db = 10 * torch.log10(torch.mean(signal))
-    noise_db = sig_avg_db - snr_db
-    sigma_noise = 10 ** (noise_db / 10)
-
-    noise = torch.normal(0, torch.ones(signal.shape) * sigma_noise)
-    channel_output = signal + noise.to(device)
-
-    channel_output = binarize(channel_output)
-    return channel_output
-
-
 def channel_coding_decoding(args, message):
     # Transmit through channel
     message_shape = message.shape

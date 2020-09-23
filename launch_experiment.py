@@ -66,6 +66,10 @@ if __name__ == "__main__":
     # Arguments for communications
     parser.add_argument('--rand_snr', type=str, default='false', help='Use random SNR for each sample during training to make it more robust')
     parser.add_argument('--snr', type=float, default=0, help='SNR')
+    parser.add_argument('--channel_type', type=str, choices=['awgn, multipath, rician'])
+    parser.add_argument('--channel_length', type=int, help='For multipath channels')
+    parser.add_argument('--tau_channel', type=float, default=1.)
+
 
     # Argument for NeuroJSCC
     parser.add_argument('--systematic', type=str, default='true', help='Systematic communication')
@@ -137,7 +141,6 @@ if args.test_period is not None:
     else:
         args.test_accs = {i: [] for i in args.ite_test}
         args.test_accs[args.num_samples_train] = []
-
 
 # Save results and weights
 if args.model == 'neurojscc':

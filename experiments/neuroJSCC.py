@@ -11,13 +11,12 @@ from snn.training_utils.snn_training import local_feedback_and_update
 from snn.utils.filters import get_filter
 from snn.data_preprocessing.load_data import get_example
 
-from utils.misc import channel
 from utils.training_utils import init_training_wispike
 from test.neurojscc_test import get_acc_neurojscc
+from utils.channels import MultiPathChannel, RicianChannel, Channel
 
 
 def train_neurojscc(args):
-
     ### Network parameters
     n_hidden_enc = args.n_h
 
@@ -29,6 +28,13 @@ def train_neurojscc(args):
 
     n_inputs_dec = n_transmitted
     n_hidden_dec = args.n_h
+
+    if args.channel_type == 'awgn':
+        args.channel = Channel()
+    elif args.channel_type == 'multipath':
+        args.channel = MultiPathChannel(n_transmitted, args.tau_channel, args.channel_length)
+    elif args.channel_type == 'rician':
+        args.channel = RicianChannel()
 
     args.lr = args.lr / (n_hidden_enc + n_hidden_dec)
 
@@ -88,12 +94,10 @@ def train_neurojscc(args):
             learning_signal, baseline_num_enc, baseline_den_enc, baseline_num_dec, baseline_den_dec, S_prime = init_training_wispike(encoder, decoder, args)
 
         for j, idx in enumerate(indices):
-            # if (j + 1) % args.dataset.root.train.data[:].shape[0] == 0:
-            #     args.lr /= 2
 
             if args.test_accs:
                 if (j + 1) in args.test_accs:
-                    acc, _ = get_acc_neurojscc(encoder, decoder, args.n_output_enc, test_data, test_indices, T, args.n_classes, args.input_shape,
+                    acc, _ = get_acc_neurojscc(encoder, decoder, args.channel, args.n_output_enc, test_data, test_indices, T, args.n_classes, args.input_shape,
                                                args.dt, args.dataset.root.stats.train_data[1], args.polarity, args.systematic, args.snr)
                     print('test accuracy at ite %d: %f' % (int(j + 1), acc))
                     args.test_accs[int(j + 1)].append(acc)
@@ -110,27 +114,30 @@ def train_neurojscc(args):
 
             refractory_period(encoder)
             refractory_period(decoder)
+            args.channel.reset()
 
             sample_enc, output_dec = get_example(train_data, idx, T, args.n_classes, args.input_shape, args.dt, args.dataset.root.stats.train_data[1], args.polarity)
 
             if args.rand_snr:
                 args.snr = np.random.choice(np.arange(0, -9, -1))
 
-            for s in range(S_prime):
+            for t in range(T):
                 # Feedforward sampling encoder
-                log_proba_enc = encoder(sample_enc[:, s])
+                log_proba_enc = encoder(sample_enc[:, t])
                 proba_hidden_enc = torch.sigmoid(encoder.potential[encoder.hidden_neurons - encoder.n_input_neurons])
 
                 if args.systematic:
-                    decoder_input = channel(torch.cat((sample_enc[:, s], encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])), decoder.device, args.snr)
+                    decoder_input = args.channel.propagate(torch.cat((sample_enc[:, t],
+                                                                      encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])),
+                                                           decoder.device, args.snr)
                 else:
-                    decoder_input = channel(encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1], decoder.device, args.snr)
+                    decoder_input = args.channel.propagate(encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1],
+                                                           decoder.device, args.snr)
 
-                sample_dec = torch.cat((decoder_input, output_dec[:, s]), dim=0).to(decoder.device)
+                sample_dec = torch.cat((decoder_input, output_dec[:, t]), dim=0).to(decoder.device)
 
                 log_proba_dec = decoder(sample_dec)
                 proba_hidden_dec = torch.sigmoid(decoder.potential[decoder.hidden_neurons - decoder.n_input_neurons])
-
 
 
                 ls = torch.sum(log_proba_dec[decoder.output_neurons - decoder.n_input_neurons]) \

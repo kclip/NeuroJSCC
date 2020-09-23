@@ -6,11 +6,10 @@ from snn.utils.misc import str2bool, make_network_parameters, find_indices_for_l
 from snn.models.SNN import BinarySNN
 from snn.utils.utils_snn import refractory_period
 from snn.data_preprocessing.load_data import get_example
+from utils.channels import MultiPathChannel, RicianChannel, Channel
 
-from utils.misc import channel
 
-
-def get_acc_neurojscc(encoder, decoder, n_output_enc, hdf5_group, test_indices, T, n_classes, input_shape, dt, x_max, polarity, systematic, snr):
+def get_acc_neurojscc(encoder, decoder, channel, n_output_enc, hdf5_group, test_indices, T, n_classes, input_shape, dt, x_max, polarity, systematic, snr):
     encoder.eval()
     encoder.reset_internal_state()
 
@@ -25,6 +24,7 @@ def get_acc_neurojscc(encoder, decoder, n_output_enc, hdf5_group, test_indices, 
     for j, idx in enumerate(test_indices):
         refractory_period(encoder)
         refractory_period(decoder)
+        channel.reset()
 
         sample_enc, _ = get_example(hdf5_group, idx, T, n_classes, input_shape, dt, x_max, polarity)
         sample_enc = sample_enc.to(encoder.device)
@@ -82,6 +82,14 @@ def neurojscc_test(args):
     encoder.import_weights(encoder_weights)
     decoder.import_weights(decoder_weights)
 
+    if args.channel_type == 'awgn':
+        args.channel = Channel()
+    elif args.channel_type == 'multipath':
+        args.channel = MultiPathChannel(n_transmitted, args.tau_channel, args.channel_length)
+    elif args.channel_type == 'rician':
+        args.channel = RicianChannel()
+
+
     res_final = {snr: [] for snr in args.snr_list}
     res_pf = {snr: [] for snr in args.snr_list}
 
@@ -90,7 +98,7 @@ def neurojscc_test(args):
             args.snr = snr
 
             test_indices = np.random.choice(find_indices_for_labels(args.dataset.root.test, args.labels), [args.num_samples_test], replace=False)
-            accs_final, accs_pf = get_acc_neurojscc(encoder, decoder, args.n_output_enc, args.dataset.root.test, test_indices, T, args.n_classes,
+            accs_final, accs_pf = get_acc_neurojscc(encoder, decoder, args.channel, args.n_output_enc, args.dataset.root.test, test_indices, T, args.n_classes,
                                                     args.input_shape, args.dt, args.dataset.root.stats.train_data[1], args.polarity, args.systematic, snr)
 
             print('snr %d, acc %f' % (snr, accs_final))
