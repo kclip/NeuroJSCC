@@ -93,7 +93,7 @@ def train_neurojscc(args):
         eligibility_trace_hidden_enc, eligibility_trace_hidden_dec, eligibility_trace_output_dec, \
             learning_signal, baseline_num_enc, baseline_den_enc, baseline_num_dec, baseline_den_dec, S_prime = init_training_wispike(encoder, decoder, args)
 
-        for j, idx in enumerate(args.indices):
+        for j, idx in enumerate(args.train_indices):
 
             if args.test_accs:
                 if (j + 1) in args.test_accs:
@@ -155,8 +155,8 @@ def train_neurojscc(args):
                     = local_feedback_and_update(encoder, 0, eligibility_trace_hidden_enc, None,
                                                 learning_signal, baseline_num_enc, baseline_den_enc, args.lr, args.beta, args.kappa)
 
-            if j % max(1, int(len(args.indices) / 5)) == 0:
-                print('Step %d out of %d' % (j, len(args.indices)))
+            if j % max(1, int(len(args.train_indices) / 5)) == 0:
+                print('Step %d out of %d' % (j, len(args.train_indices)))
 
         # At the end of training, save final weights if none exist or if this ite was better than all the others
         if not os.path.exists(args.save_path + '/encoder_weights_final.hdf5'):
