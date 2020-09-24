@@ -18,6 +18,23 @@ class Channel:
         self.unnoisy_output = None
 
 
+class AWGNChannel(Channel):
+    def __init__(self):
+        super(AWGNChannel, self).__init__()
+
+    def propagate(self, signal, device, snr_db):
+        if self.unnoisy_output is None:
+            self.unnoisy_output = signal.unsqueeze(0)
+
+        else:
+            self.unnoisy_output = torch.cat((self.unnoisy_output, signal.unsqueeze(0)), dim=0)
+
+        noise = self.generate_noise(snr_db, device)
+        channel_output = self.unnoisy_output + noise
+
+        return channel_output[-1]
+
+
 class MultiPathChannel(Channel):
     def __init__(self, dim, tau, length_filter):
         super(MultiPathChannel, self).__init__()
@@ -41,7 +58,7 @@ class MultiPathChannel(Channel):
                 multipath_sig = channel_output[i] * self.exp_filter[:len_multipath]
                 channel_output[i + 1: i + 1 + len_multipath] = multipath_sig
 
-        return channel_output
+        return channel_output[-1]
 
 
 class RicianChannel(Channel):
@@ -59,4 +76,4 @@ class RicianChannel(Channel):
         channel_gains = 1 + torch.normal(0, torch.ones(signal.shape) * torch.sqrt(torch.ones([1]))).to(device)
         channel_output = channel_gains * signal + noise
 
-        return channel_output
+        return channel_output[-1]
