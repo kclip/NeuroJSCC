@@ -14,7 +14,7 @@ from snn.data_preprocessing.load_data import get_example
 from utils.training_utils import init_training_wispike
 from test.neurojscc_test import get_acc_neurojscc
 from utils.channels import MultiPathChannel, RicianChannel, Channel
-
+from utils.misc import binarize
 
 def train_neurojscc(args):
     ### Network parameters
@@ -91,7 +91,7 @@ def train_neurojscc(args):
 
         # init training
         eligibility_trace_hidden_enc, eligibility_trace_hidden_dec, eligibility_trace_output_dec, \
-            learning_signal, baseline_num_enc, baseline_den_enc, baseline_num_dec, baseline_den_dec, S_prime = init_training_wispike(encoder, decoder, args)
+        learning_signal, baseline_num_enc, baseline_den_enc, baseline_num_dec, baseline_den_dec, S_prime = init_training_wispike(encoder, decoder, args)
 
         for j, idx in enumerate(args.train_indices):
 
@@ -127,12 +127,12 @@ def train_neurojscc(args):
                 proba_hidden_enc = torch.sigmoid(encoder.potential[encoder.hidden_neurons - encoder.n_input_neurons])
 
                 if args.systematic:
-                    decoder_input = args.channel.propagate(torch.cat((sample_enc[:, t],
-                                                                      encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])),
-                                                           decoder.device, args.snr)
+                    decoder_input = binarize(args.channel.propagate(torch.cat((sample_enc[:, t],
+                                                                               encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])),
+                                                                    decoder.device, args.snr))
                 else:
-                    decoder_input = args.channel.propagate(encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1],
-                                                           decoder.device, args.snr)
+                    decoder_input = binarize(args.channel.propagate(encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1],
+                                                                    decoder.device, args.snr))
 
                 sample_dec = torch.cat((decoder_input, output_dec[:, t]), dim=0).to(decoder.device)
 
