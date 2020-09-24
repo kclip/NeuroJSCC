@@ -40,7 +40,7 @@ def train_neurojscc(args):
 
     for _ in range(args.num_ite):
         ### Find indices
-        indices, test_indices = get_indices(args)
+        get_indices(args)
 
         encoder = BinarySNN(**make_network_parameters(network_type=args.model,
                                                       n_input_neurons=args.n_input_neurons,
@@ -93,11 +93,11 @@ def train_neurojscc(args):
         eligibility_trace_hidden_enc, eligibility_trace_hidden_dec, eligibility_trace_output_dec, \
             learning_signal, baseline_num_enc, baseline_den_enc, baseline_num_dec, baseline_den_dec, S_prime = init_training_wispike(encoder, decoder, args)
 
-        for j, idx in enumerate(indices):
+        for j, idx in enumerate(args.indices):
 
             if args.test_accs:
                 if (j + 1) in args.test_accs:
-                    acc, _ = get_acc_neurojscc(encoder, decoder, args.channel, args.n_output_enc, test_data, test_indices, T, args.n_classes, args.input_shape,
+                    acc, _ = get_acc_neurojscc(encoder, decoder, args.channel, args.n_output_enc, test_data, args.test_indices, T, args.n_classes, args.input_shape,
                                                args.dt, args.dataset.root.stats.train_data[1], args.polarity, args.systematic, args.snr)
                     print('test accuracy at ite %d: %f' % (int(j + 1), acc))
                     args.test_accs[int(j + 1)].append(acc)
@@ -155,8 +155,8 @@ def train_neurojscc(args):
                     = local_feedback_and_update(encoder, 0, eligibility_trace_hidden_enc, None,
                                                 learning_signal, baseline_num_enc, baseline_den_enc, args.lr, args.beta, args.kappa)
 
-            if j % max(1, int(len(indices) / 5)) == 0:
-                print('Step %d out of %d' % (j, len(indices)))
+            if j % max(1, int(len(args.indices) / 5)) == 0:
+                print('Step %d out of %d' % (j, len(args.indices)))
 
         # At the end of training, save final weights if none exist or if this ite was better than all the others
         if not os.path.exists(args.save_path + '/encoder_weights_final.hdf5'):
