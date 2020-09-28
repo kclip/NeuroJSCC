@@ -9,6 +9,7 @@ from snn.data_preprocessing.load_data import get_example
 from utils.channels import MultiPathChannel, RicianChannel, Channel
 from utils.misc import binarize
 
+
 def get_acc_neurojscc(encoder, decoder, channel, n_output_enc, hdf5_group, test_indices, T, n_classes, input_shape, dt, x_max, polarity, systematic, snr):
     encoder.eval()
     encoder.reset_internal_state()
@@ -33,9 +34,9 @@ def get_acc_neurojscc(encoder, decoder, channel, n_output_enc, hdf5_group, test_
             _ = encoder(sample_enc[:, t])
 
             if systematic:
-                decoder_input = binarize(channel(torch.cat((sample_enc[:, t], encoder.spiking_history[encoder.hidden_neurons[-n_output_enc:], -1])), decoder.device, snr))
+                decoder_input = binarize(channel.propagate(torch.cat((sample_enc[:, t], encoder.spiking_history[encoder.hidden_neurons[-n_output_enc:], -1])), decoder.device, snr))
             else:
-                decoder_input = binarize(channel(encoder.spiking_history[encoder.hidden_neurons[-n_output_enc:], -1], decoder.device, snr))
+                decoder_input = binarize(channel.propagate(encoder.spiking_history[encoder.hidden_neurons[-n_output_enc:], -1], decoder.device, snr))
 
             _ = decoder(decoder_input)
             outputs[j, :, t] = decoder.spiking_history[decoder.output_neurons, -1]
