@@ -26,7 +26,7 @@ def get_acc_neurojscc(encoder, decoder, n_output_enc, hdf5_group, test_indices, 
         refractory_period(encoder)
         refractory_period(decoder)
 
-        sample_enc, _ = get_example(hdf5_group, idx, T, n_classes, input_shape, dt, x_max, polarity)
+        sample_enc, _ = get_example(hdf5_group, idx, T, [i for i in range(10)], input_shape, dt, x_max, polarity)
         sample_enc = sample_enc.to(encoder.device)
 
         for t in range(T):

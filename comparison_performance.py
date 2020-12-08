@@ -42,10 +42,10 @@ if __name__ == "__main__":
 print(args)
 
 if args.where == 'local':
-    args.home = r'C:/Users/K1804053/PycharmProjects'
-    args.results = args.home + '/results/results_wispike/'
+    args.home = r"C:\Users\K1804053\OneDrive - King's College London\PycharmProjects"
+    args.results = r'C:/Users/K1804053/results/results_wispike/'
 elif args.where == 'rosalind':
-    args.home = r'/users/k1804053'
+    args.home = r'/scratch/users/k1804053'
     args.results = args.home + '/results/'
 elif args.where == 'jade':
     args.home = r'/jmain01/home/JAD014/mxm09/nxs94-mxm09'
