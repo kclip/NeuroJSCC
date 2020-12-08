@@ -63,7 +63,7 @@ def framed_to_example(frames, args, T):
 
 
 def get_intermediate_dims(vqvae, args, T, dataset):
-    example, _ = get_example(dataset.root.train, 0, T, args.n_classes, args.input_shape, args.dt, dataset.root.stats.train_data[1], args.polarity)
+    example, _ = get_example(dataset.root.train, 0, T, [i for i in range(10)], args.input_shape, args.dt, dataset.root.stats.train_data[1], args.polarity)
     example_frame = example_to_framed(example, args, T)[0].unsqueeze(0)
     args.frame_shape = example_frame.shape
 

@@ -45,7 +45,7 @@ def classify_snn(network, example, args):
 
 
 def classify_mlp(network, example, args):
-    inputs = framed_to_example(example, args).flatten()
+    inputs = framed_to_example(example, args, args.T).flatten()
     output = network(inputs)
     predictions_final = torch.argmax(output)
     example_padded = torch.zeros(example.shape)
@@ -53,7 +53,7 @@ def classify_mlp(network, example, args):
 
     for f in range(example.shape[0]):
         example_padded[f] = example[f]
-        inputs = framed_to_example(example_padded, args).flatten()
+        inputs = framed_to_example(example_padded, args, args.T).flatten()
         output = network(inputs)
         predictions_pf[f] = torch.argmax(output)
 
@@ -72,7 +72,7 @@ def get_acc_classifier(classifier, vqvae, args, indices):
         predictions_pf = torch.zeros([len(indices), args.n_frames], dtype=torch.long)
 
     for i, idx in enumerate(indices):
-        example, outputs = get_example(args.dataset.root.test, idx, T, args.n_classes, args.input_shape, args.dt,
+        example, outputs = get_example(args.dataset.root.test, idx, T, [i for i in range(10)], args.input_shape, args.dt,
                                        args.dataset.root.stats.train_data[1], args.polarity)
         data = example_to_framed(example, args, T)
         data_reconstructed = torch.zeros(data.shape)

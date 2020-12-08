@@ -19,11 +19,11 @@ def vqvae_test(args):
     args.lr_vqvae = 0
 
     ### Encoder & classifier
-    vqvae, _ = init_vqvae(args, args.dataset)
+    vqvae, _ = init_vqvae(args, args.T)
 
     weights = args.results + args.weights
     if args.classifier == 'snn':
-        network = BinarySNN(**make_network_parameters(args.n_input_neurons, args.n_output_neurons, args.n_h),
+        network = BinarySNN(**make_network_parameters('snn', args.n_input_neurons, args.n_output_neurons, args.n_h),
                             device=args.device)
 
         if args.classifier_weights is not None:
@@ -47,7 +47,7 @@ def vqvae_test(args):
         network.eval()
 
     elif args.classifier == 'mlp':
-        n_input_neurons = np.prod(args.dataset.root.stats.train_data[1:])
+        n_input_neurons = args.T * (args.dataset.root.stats.train_data[1] ** 2) * (1 + args.polarity)
         n_output_neurons = args.dataset.root.stats.train_label[1]
 
         network = MLP(n_input_neurons, args.n_h, n_output_neurons)
@@ -66,7 +66,7 @@ def vqvae_test(args):
 
 
     ### Channel & coding
-    args.quantized_dim, args.encodings_dim = get_intermediate_dims(vqvae, args, args.dataset)
+    args.quantized_dim, args.encodings_dim = get_intermediate_dims(vqvae, args, args.T, args.dataset)
     args.H, args.G, args.k = init_ldpc(args.encodings_dim)
 
     res_final = {snr: [] for snr in args.snr_list}
