@@ -15,7 +15,7 @@ from utils.misc import example_to_framed, channel_coding_decoding
 def ook_test(args):
     args.residual = 0  # Samples are sent 1 by 1
 
-    network = BinarySNN(**make_network_parameters(args.n_input_neurons, args.n_output_neurons, args.n_h),
+    network = BinarySNN(**make_network_parameters('snn', args.n_input_neurons, args.n_output_neurons, args.n_h),
                         device=args.device)
 
     weights = args.results + args.classifier_weights
@@ -31,12 +31,15 @@ def ook_test(args):
 
             predictions_final = torch.zeros([args.num_samples_test], dtype=torch.long)
             predictions_pf = torch.zeros([args.num_samples_test, args.n_frames], dtype=torch.long)
+            true_classes = torch.zeros([len(test_indices)])
 
             for i, idx in enumerate(test_indices):
-                sample = channel(torch.FloatTensor(args.dataset.root.test.data[idx]).to(network.device), network.device, snr)
+                inputs, labels = get_example(args.dataset.root.test, idx, args.T, [i for i in range(10)], args.input_shape, args.dt, 26, args.polarity)
+                sample = channel(inputs.to(network.device), network.device, snr)
                 predictions_final[i], predictions_pf[i] = classify(network, sample, args)
 
-            true_classes = torch.LongTensor(args.dataset.root.test.labels[test_indices, 0])
+                true_classes[i] = torch.sum(labels, dim=-1).argmax(-1).type_as(true_classes)
+
 
             accs_final = float(torch.sum(predictions_final == true_classes, dtype=torch.float) / len(predictions_final))
             accs_pf = torch.zeros([args.n_frames], dtype=torch.float)
@@ -60,7 +63,7 @@ def ook_ldpc_test(args):
     args.n_frames = 80  # Samples are sent 1 by 1
     args.residual = 0
 
-    network = BinarySNN(**make_network_parameters(args.n_input_neurons, args.n_output_neurons, args.n_h),
+    network = BinarySNN(**make_network_parameters('snn', args.n_input_neurons, args.n_output_neurons, args.n_h),
                         device=args.device)
 
     weights = args.results + args.classifier_weights
@@ -106,7 +109,7 @@ def ook_ldpc_test(args):
             predictions_pf = torch.zeros([args.num_samples_test, args.n_frames], dtype=torch.long)
 
             for i, idx in enumerate(test_indices):
-                data = example_to_framed(args.dataset.root.test.data[idx, :, :], args)
+                data = example_to_framed(args.dataset.root.test.data[idx, :, :], args, args.T)
                 data_reconstructed = torch.zeros(data.shape)
 
                 for j in range(args.n_frames):

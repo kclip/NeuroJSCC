@@ -15,7 +15,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     # Training arguments
-    parser.add_argument('--where', default='local')
+    parser.add_argument('--home')
+    parser.add_argument('--results')
     parser.add_argument('--model', choices=['neurojscc', 'ook', 'ook_ldpc', 'vqvae'])
     parser.add_argument('--weights', type=str, default=None, help='Path to weights to load')
     parser.add_argument('--disable-cuda', type=str, default='true', help='Disable CUDA')
@@ -41,31 +42,19 @@ if __name__ == "__main__":
 
 print(args)
 
-if args.where == 'local':
-    args.home = r"C:\Users\K1804053\OneDrive - King's College London\PycharmProjects"
-    args.results = r'C:/Users/K1804053/results/results_wispike/'
-elif args.where == 'rosalind':
-    args.home = r'/scratch/users/k1804053'
-    args.results = args.home + '/results/'
-elif args.where == 'jade':
-    args.home = r'/jmain01/home/JAD014/mxm09/nxs94-mxm09'
-elif args.where == 'gcloud':
-    args.home = r'/home/k1804053'
-    args.results = args.home + '/results/'
+if args.weights is not None:
+    try:
+        exp_args_path = args.results + args.weights + '/commandline_args.pkl'
+        args_dict = vars(args)
 
+        with open(exp_args_path, 'rb') as f:
+            exp_args = pickle.load(f)
 
-try:
-    exp_args_path = args.results + args.weights + '/commandline_args.pkl'
-    args_dict = vars(args)
+        for key in exp_args.keys():
+            args_dict[key] = exp_args[key]
 
-    with open(exp_args_path, 'rb') as f:
-        exp_args = pickle.load(f)
-
-    for key in exp_args.keys():
-        args_dict[key] = exp_args[key]
-
-except FileNotFoundError:
-    pass
+    except FileNotFoundError:
+        pass
 
 
 dataset = args.home + r'/datasets/mnist-dvs/mnist_dvs_events.hdf5'
@@ -82,7 +71,7 @@ args.save_path = None
 
 args.labels = [1, 7]
 args.polarity = str2bool(args.polarity)
-
+args.T = int(args.sample_length * 1000 / args.dt)
 ### Learning parameters
 args.num_samples_test = args.dataset.root.stats.test_data[0]
 args.num_samples_test = min(args.num_samples_test, len(find_indices_for_labels(args.dataset.root.test, args.labels)))
