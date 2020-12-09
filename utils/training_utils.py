@@ -136,11 +136,12 @@ def train_classifier(model, args, idx):
     inputs, label = get_example(args.dataset.root.train, idx, T, args.n_classes, args.input_shape, args.dt, args.dataset.root.stats.train_data[1], args.polarity)
 
     if isinstance(model, BinarySNN):
-        example = torch.cat((inputs, label), dim=0).to(model.device)
+        inputs = inputs.to(model.device)
+        label = label.to(model.device)
 
         model.train()
         log_proba, args.eligibility_trace_hidden, args.eligibility_trace_output, args.learning_signal, args.baseline_num, args.baseline_den = \
-            train_on_example(model, T, example, args.gamma, args.r, args.eligibility_trace_hidden, args.eligibility_trace_output,
+            train_on_example(model, T, inputs, label, args.gamma, args.r, args.eligibility_trace_hidden, args.eligibility_trace_output,
                              args.learning_signal, args.baseline_num, args.baseline_den, args.lr, args.beta, args.kappa)
 
 

@@ -116,19 +116,17 @@ def train_neurojscc(args):
             if args.rand_snr:
                 args.snr = np.random.choice(np.arange(0, -9, -1))
 
-            for s in range(S_prime):
+            for t in range(T):
                 # Feedforward sampling encoder
-                log_proba_enc = encoder(sample_enc[:, s])
+                log_proba_enc = encoder(sample_enc[:, t])
                 proba_hidden_enc = torch.sigmoid(encoder.potential[encoder.hidden_neurons - encoder.n_input_neurons])
 
                 if args.systematic:
-                    decoder_input = channel(torch.cat((sample_enc[:, s], encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])), decoder.device, args.snr)
+                    decoder_input = channel(torch.cat((sample_enc[:, t], encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1])), decoder.device, args.snr)
                 else:
                     decoder_input = channel(encoder.spiking_history[encoder.hidden_neurons[-args.n_output_enc:], -1], decoder.device, args.snr)
 
-                sample_dec = torch.cat((decoder_input, output_dec[:, s]), dim=0).to(decoder.device)
-
-                log_proba_dec = decoder(sample_dec)
+                log_proba_dec = decoder(decoder_input, output_dec[:, t])
                 proba_hidden_dec = torch.sigmoid(decoder.potential[decoder.hidden_neurons - decoder.n_input_neurons])
 
 
