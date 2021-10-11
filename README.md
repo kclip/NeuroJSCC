@@ -6,8 +6,7 @@ N. Skatchkovsky, H. Jang, and O. Simeone, End-to-End Learning of Neuromorphic Wi
 https://arxiv.org/abs/2009.01527
 
 To run, this code requires to install our `snn` package, which can be found at https://github.com/kclip/snn
-This repo will not be maintained actively, the latest working version of the snn package is commit f352ea5042375d8c779f0ef893386d032c2b4c73
-
+This repo will not be maintained actively, the latest working version of the snn package is commit 6ba3465
 # Run example
 An experiment can be run on the MNIST-DVS dataset by launching
 
