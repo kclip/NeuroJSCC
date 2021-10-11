@@ -2,7 +2,7 @@ import pickle
 
 import torch
 import numpy as np
-from snn.utils.misc import str2bool, make_network_parameters, find_indices_for_labels
+from snn.utils.misc import str2bool, make_network_parameters
 from snn.models.SNN import BinarySNN
 from snn.utils.utils_snn import refractory_period
 from snn.data_preprocessing.load_data import get_example
@@ -10,46 +10,45 @@ from snn.data_preprocessing.load_data import get_example
 from utils.misc import channel
 
 
-def get_acc_neurojscc(encoder, decoder, n_output_enc, hdf5_group, test_indices, T, n_classes, input_shape, dt, x_max, polarity, systematic, snr):
+def get_acc_neurojscc(encoder, decoder, n_output_enc, test_iter, n_examples_test, T, systematic, snr):
     encoder.eval()
     encoder.reset_internal_state()
 
     decoder.eval()
     decoder.reset_internal_state()
 
-    outputs = torch.zeros([len(test_indices), decoder.n_output_neurons, T])
+    outputs = torch.zeros([len(test_iter), decoder.n_output_neurons, T])
 
-    true_classes = torch.LongTensor(hdf5_group.labels[test_indices, 0])
-    hidden_hist = torch.zeros([encoder.n_hidden_neurons + decoder.n_hidden_neurons, T])
+    true_labels = np.array([])
 
-    for j, idx in enumerate(test_indices):
-        refractory_period(encoder)
+    for j in range(n_examples_test):
+        sample_enc, label = next(test_iter)
+        refractory_period(encoder)  # reset networks between examples
         refractory_period(decoder)
 
-        sample_enc, _ = get_example(hdf5_group, idx, T, [i for i in range(10)], input_shape, dt, x_max, polarity)
-        sample_enc = sample_enc.to(encoder.device)
+        sample_enc = sample_enc[0].to(encoder.device)
+        label = torch.sum(label, dim=-1).argmax(-1)
+        true_labels = np.hstack((true_labels, label.cpu().numpy()))
 
         for t in range(T):
-            _ = encoder(sample_enc[:, t])
+            encoder(sample_enc[t])  # propagate through encoder
 
+            ### Transmit sample through the channel
             if systematic:
-                decoder_input = channel(torch.cat((sample_enc[:, t], encoder.spiking_history[encoder.hidden_neurons[-n_output_enc:], -1])), decoder.device, snr)
+                decoder_input = channel(torch.cat((sample_enc[t], encoder.spiking_history[encoder.hidden_neurons[-n_output_enc:], -1])), decoder.device, snr)
             else:
                 decoder_input = channel(encoder.spiking_history[encoder.hidden_neurons[-n_output_enc:], -1], decoder.device, snr)
 
-            _ = decoder(decoder_input)
+            decoder(decoder_input)  # propagate through decoder
             outputs[j, :, t] = decoder.spiking_history[decoder.output_neurons, -1]
 
-            hidden_hist[:encoder.n_hidden_neurons, t] = encoder.spiking_history[encoder.hidden_neurons, -1]
-            hidden_hist[encoder.n_hidden_neurons:, t] = decoder.spiking_history[decoder.hidden_neurons, -1]
-
     predictions = torch.max(torch.sum(outputs, dim=-1), dim=-1).indices
-    accs_final = float(torch.sum(predictions == true_classes, dtype=torch.float) / len(predictions))
+    accs_final = np.sum(predictions.cpu().numpy() == true_labels) / len(predictions)
 
-    accs_pf = torch.zeros([T], dtype=torch.float)
+    accs_pf = torch.zeros([T], dtype=torch.float) # accuracy per frame
     for t in range(1, T):
         predictions = torch.sum(outputs[:, :, :t], dim=-1).argmax(-1)
-        acc = float(torch.sum(predictions == true_classes, dtype=torch.float) / len(predictions))
+        acc = np.sum(predictions.cpu().numpy() == true_labels) / len(predictions)
         accs_pf[t] = acc
 
     return accs_final, accs_pf

@@ -169,8 +169,6 @@ def init_training_wispike(encoder, decoder, args):
     baseline_num_dec = {parameter: eligibility_trace_hidden_dec[parameter].pow(2) * learning_signal for parameter in eligibility_trace_hidden_dec}
     baseline_den_dec = {parameter: eligibility_trace_hidden_dec[parameter].pow(2) for parameter in eligibility_trace_hidden_dec}
 
-    T = args.dataset.root.stats.train_data[-1]
-
     return eligibility_trace_hidden_enc, eligibility_trace_hidden_dec, eligibility_trace_output_dec,\
-           learning_signal, baseline_num_enc, baseline_den_enc, baseline_num_dec, baseline_den_dec, T
+           learning_signal, baseline_num_enc, baseline_den_enc, baseline_num_dec, baseline_den_dec
 

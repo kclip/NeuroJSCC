@@ -4,7 +4,6 @@ import numpy as np
 import tables
 import torch
 import argparse
-from snn.utils.misc import get_indices
 from snn.models.SNN import BinarySNN
 
 from utils import training_utils
