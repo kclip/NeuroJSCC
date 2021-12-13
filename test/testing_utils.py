@@ -60,20 +60,26 @@ def classify_mlp(network, example, args):
     return predictions_final, predictions_pf
 
 
-def get_acc_classifier(classifier, vqvae, args, indices):
+def get_acc_classifier(classifier, vqvae, args, test_dl):
     vqvae.eval()
 
+    test_iter = iter(test_dl)
+    n_examples = len(list(test_iter))
     T = int(args.sample_length * 1000 / args.dt)
-    predictions_final = torch.zeros([len(indices)], dtype=torch.long)
+    predictions_final = torch.zeros([n_examples], dtype=torch.long)
 
     if args.classifier == 'snn':
-        predictions_pf = torch.zeros([len(indices), T], dtype=torch.long)
+        predictions_pf = torch.zeros([n_examples, T], dtype=torch.long)
     else:
-        predictions_pf = torch.zeros([len(indices), args.n_frames], dtype=torch.long)
+        predictions_pf = torch.zeros([n_examples, args.n_frames], dtype=torch.long)
 
-    for i, idx in enumerate(indices):
-        example, outputs = get_example(args.dataset.root.test, idx, T, [i for i in range(10)], args.input_shape, args.dt,
-                                       args.dataset.root.stats.train_data[1], args.polarity)
+    true_classes = torch.Tensor()
+
+    test_iter = iter(test_dl)
+    for i, (example, outputs) in enumerate(test_iter):
+        example = example[0]
+        outputs = outputs
+
         data = example_to_framed(example, args, T)
         data_reconstructed = torch.zeros(data.shape)
 
@@ -88,8 +94,7 @@ def get_acc_classifier(classifier, vqvae, args, indices):
                 data_reconstructed[f] = vqvae.decode(encodings_decoded, args.quantized_dim)
 
         predictions_final[i], predictions_pf[i] = classify(classifier, data_reconstructed, args)
-
-    true_classes = torch.LongTensor(args.dataset.root.test.labels[indices, 0])
+        true_classes = torch.cat((true_classes, torch.sum(outputs, dim=1).argmax(-1).type_as(true_classes)))
 
     accs_final = float(torch.sum(predictions_final == true_classes, dtype=torch.float) / len(predictions_final))
     accs_pf = torch.zeros(predictions_pf.shape, dtype=torch.float)

@@ -33,11 +33,10 @@ def init_vqvae(args, T):
     return vqvae, optimizer
 
 
-def train_vqvae(model, optimizer, args, train_res_recon_error, train_res_perplexity, idx):
+def train_vqvae(model, optimizer, args, train_res_recon_error, train_res_perplexity, example):
     model.train()
 
     T = int(args.sample_length * 1000 / args.dt)
-    example, label = get_example(args.dataset.root.train, idx, T, args.n_classes, args.input_shape, args.dt, args.dataset.root.stats.train_data[1], args.polarity)
 
     framed = example_to_framed(example, args, T)
 
@@ -74,8 +73,8 @@ def init_ldpc(message_dim):
 ### Classifiers
 def init_classifier(args, T):
     if args.classifier == 'snn':
-        n_input_neurons = args.dataset.root.stats.train_data[1] ** 2
-        n_output_neurons = args.dataset.root.stats.train_label[1]
+        n_input_neurons = args.x_max ** 2
+        n_output_neurons = 2 # only 1 and 7
 
 
         classifier = BinarySNN(**make_network_parameters(network_type=args.model,
@@ -102,8 +101,8 @@ def init_classifier(args, T):
             args.learning_signal, args.baseline_num, args.baseline_den = init_training(classifier)
 
     elif args.classifier == 'mlp':
-        n_input_neurons = args.dataset.root.stats.train_data[1] * T
-        n_output_neurons = args.dataset.root.stats.train_label[1]
+        n_input_neurons = args.x_max * T
+        n_output_neurons = args.n_classes
 
         classifier = MLP(n_input_neurons, args.n_h, n_output_neurons)
         args.mlp_optimizer = torch.optim.SGD(classifier.parameters(), lr=args.lr)
@@ -131,9 +130,8 @@ def train_mlp(model, example, label, optimizer, criterion):
     optimizer.step()
 
 
-def train_classifier(model, args, idx):
+def train_classifier(model, args, inputs, label):
     T = int(args.sample_length * 1000 / args.dt)
-    inputs, label = get_example(args.dataset.root.train, idx, T, args.n_classes, args.input_shape, args.dt, args.dataset.root.stats.train_data[1], args.polarity)
 
     if isinstance(model, BinarySNN):
         inputs = inputs.to(model.device)
@@ -146,7 +144,7 @@ def train_classifier(model, args, idx):
 
 
     elif isinstance(model, MLP):
-        example = torch.FloatTensor(args.dataset.root.train.data[idx]).flatten()
+        example = inputs.flatten()
         label = torch.tensor(np.argmax(np.sum(label, axis=(-1)), axis=-1))
 
         train_mlp(model, example, label, args.mlp_optimizer, args.mlp_criterion)

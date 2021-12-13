@@ -9,7 +9,6 @@ from snn.utils.misc import make_network_parameters, str2bool
 from snn.models.SNN import BinarySNN
 from snn.training_utils.snn_training import local_feedback_and_update
 from snn.utils.filters import get_filter
-from snn.data_preprocessing.load_data import get_example
 
 from utils.misc import channel
 from utils.training_utils import init_training_wispike
@@ -80,10 +79,6 @@ def train_neurojscc(args):
 
         input_size = [np.prod([1 + args.polarity, args.x_max, args.x_max])]
         T = int(args.sample_length * 1000 / args.dt)
-        print('//////////////////////')
-        print(T)
-        print(input_size)
-        print('//////////////////////')
 
         # Create dataloaders
         train_dl, test_dl = create_dataloader(args.dataset_path, batch_size=1, size=input_size, classes=[1, 7],
